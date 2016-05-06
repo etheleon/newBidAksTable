@@ -5,19 +5,28 @@ import javax.swing.JTable;
 import javax.swing.table.AbstractTableModel;
 import java.awt.Dimension;
 import java.awt.GridLayout;
+import java.util.HashMap;
+import java.util.concurrent.*;
+import java.nio.ByteBuffer;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import javax.swing.table.DefaultTableCellRenderer;
+import java.text.DecimalFormat;
+import java.awt.Component;
 
 /**
- * TableDemo is just like SimpleTableDemo, except that it
- * uses a custom TableModel.
+ * TableDemo is a GUI for OANDA prices
+ *
  */
 public class TableDemo extends JPanel {
     private boolean DEBUG = false;
+    MyTableModel tableModel = new MyTableModel(); //not part of original code
 
     public TableDemo() {
         super(new GridLayout(1,0));
 
-        JTable table = new JTable(new MyTableModel());
-        table.setPreferredScrollableViewportSize(new Dimension(500, 70));
+        JTable table = new JTable(tableModel);
+        table.setPreferredScrollableViewportSize(new Dimension(500, 200));
         table.setFillsViewportHeight(true);
 
         //Create the scroll pane and add the table to it.
@@ -25,25 +34,78 @@ public class TableDemo extends JPanel {
 
         //Add the scroll pane to this panel.
         add(scrollPane);
+
+        // renderer
+        table.getColumnModel().getColumn(3).setCellRenderer(new myDoubleRenderer());
+        table.getColumnModel().getColumn(4).setCellRenderer(new myDoubleRenderer());
     }
 
+    static class myDoubleRenderer extends DefaultTableCellRenderer {
+        private static final DecimalFormat formatter = new DecimalFormat( "####.######" );
+
+        public Component getTableCellRendererComponent(
+                JTable table, Object value, boolean isSelected,
+                boolean hasFocus, int row, int column) {
+
+            // First format the cell value as required
+
+            value = formatter.format((Number)value);
+
+            // And pass it on to parent class
+
+            return super.getTableCellRendererComponent(
+                    table, value, isSelected, hasFocus, row, column );
+        }
+    }
+
+
+
     class MyTableModel extends AbstractTableModel {
-        private String[] columnNames = {"First Name",
-                "Last Name",
-                "Sport",
-                "# of Years",
-                "Vegetarian"};
+        private String[] columnNames = {
+                "Type",
+                "ID",
+                "TIME",
+                "Bid",
+                "Ask",
+                "Size"
+        };
+
+
+
         private Object[][] data = {
-                {"Kathy", "Smith",
-                        "Snowboarding", new Integer(5), new Boolean(false)},
-                {"John", "Doe",
-                        "Rowing", new Integer(3), new Boolean(true)},
-                {"Sue", "Black",
-                        "Knitting", new Integer(2), new Boolean(false)},
-                {"Jane", "White",
-                        "Speed reading", new Integer(20), new Boolean(true)},
-                {"Joe", "Brown",
-                        "Pool", new Integer(10), new Boolean(false)}
+
+                {"p","EUR/JPY",0,0,0,3000000},
+                {"p","EUR/JPY",0,0,0,1000000},
+
+                {"p","USD/CAD",0,0,0,3000000},
+                {"p","USD/CAD",0,0,0,1000000},
+
+                {"p","GBP/JPY",0,0,0,3000000},
+                {"p","GBP/JPY",0,0,0,1000000},
+
+                {"p","EUR/JPY",0,0,0,3000000},
+                {"p","EUR/JPY",0,0,0,1000000},
+
+                {"p","USD/JPY",0,0,0,3000000},
+                {"p","USD/JPY",0,0,0,1000000},
+
+                {"p","EUR/GBP",0,0,0,3000000},
+                {"p","EUR/GBP",0,0,0,1000000},
+
+                {"p","GBP/USD",0,0,0,3000000},
+                {"p","GBP/USD",0,0,0,1000000},
+
+                {"p","EUR/AUD",0,0,0,3000000},
+                {"p","EUR/AUD",0,0,0,1000000},
+
+                {"p","USD/SGD",0,0,0,3000000},
+                {"p","USD/SGD",0,0,0,1000000},
+
+                {"p","AUD/USD",0,0,0,3000000},
+                {"p","AUD/USD",0,0,0,1000000},
+
+                {"p","AUD/JPY",0,0,0,3000000},
+                {"p","AUD/JPY",0,0,0,1000000}
         };
 
         public int getColumnCount() {
@@ -128,7 +190,7 @@ public class TableDemo extends JPanel {
      * this method should be invoked from the
      * event-dispatching thread.
      */
-    private static void createAndShowGUI() {
+    private static TableDemo createAndShowGUI() {
         //Create and set up the window.
         JFrame frame = new JFrame("TableDemo");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -141,49 +203,85 @@ public class TableDemo extends JPanel {
         //Display the window.
         frame.pack();
         frame.setVisible(true);
+        return newContentPane;
     }
 
+    static TableDemo instance;
+
     public static void main(String[] args) {
+
         //Schedule a job for the event-dispatching thread:
         //creating and showing this application's GUI.
         javax.swing.SwingUtilities.invokeLater(new Runnable() {
             public void run() {
-                createAndShowGUI();
+                instance = createAndShowGUI();
             }
         });
+
+        BlockingQueue queue = new ArrayBlockingQueue(1024);
+        Producer producer = new Producer(queue);
+//        Consumer consumer = new Consumer(queue);
+        new Thread(producer).start();
+//        new Thread(consumer).start();
+        final HashMap hm = new HashMap();
+
+            hm.put(709043012, 0); //EUR/JPY
+            hm.put(-57566941, 2); //USD/CAD
+            hm.put(1912155393,4); //GBP/JYP
+            hm.put(871818727, 6); //EUR/USD
+            hm.put(353631269, 8); //USD/JPY
+            hm.put(-1324321699,10); //EUR/GBP
+            hm.put(1475230038,12); //GBP/USD
+            hm.put(1485730906,14); //EUR/AUD
+            hm.put(656997788,16); //USD/SGD
+            hm.put(-1359928140,18); //AUD/USD
+            hm.put(-1373310881,20); //AUD/JPY
+
+        while (true) {
+            try {
+                Thread.sleep(1);
+                ByteBuffer trade    = (ByteBuffer) queue.take();
+                final char first    = (char) trade.get();
+                final int id        = trade.getInt();
+                final long time     = trade.getLong();
+                final double bid    = trade.getDouble();
+                final double ask    = trade.getDouble();
+                final int size      = trade.getInt();
+
+                byte[] array        = new byte[trade.get()];
+                trade.get(array);
+                String data = new String(array);
+
+                if(size == 1000000 && id == 1475230038) {
+                    System.out.println("ask: " + ask);
+               }
+                javax.swing.SwingUtilities.invokeLater(new Runnable() {
+                    public void run() {
+
+                        int row = (int) hm.get(id);
+                        row = (size == 3000000) ? row : row + 1;
+
+                        long unixSeconds = time;
+                        Date date = new Date(unixSeconds);
+                        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss z");
+                        String formattedDate = sdf.format(date);
+/*
+                        sdf.setTimeZone(TimeZone.getTimeZone("GMT")); // give a timezone reference for formating (see comment at the bottom
+*/
+                        instance.tableModel.setValueAt(first, row, 0);
+                        instance.tableModel.setValueAt(formattedDate, row, 2);
+                        // instance.tableModel.setValueAt(time, row, 2);
+                        instance.tableModel.setValueAt(bid, row, 3);
+                        instance.tableModel.setValueAt(ask, row, 4);
+                        instance.tableModel.setValueAt(size, row, 5);
+
+                    }
+                });
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+
     }
 }
 
-/*
-    private	JPanel  topPanel;
-    private	JTable  table;
-    private	JScrollPane scrollPane;
-
-    public bidAskTable() {
-        setTitle( "Stocks ask bid price" );
-        setSize( 300, 200 );
-        setBackground( Color.gray );
-
-        // Create a panel to hold all other components
-        topPanel = new JPanel();
-        topPanel.setLayout( new BorderLayout() );
-        getContentPane().add( topPanel );
-//        Object[] columnNames = { "ID", "Time", "Bid", "Ask", "Size", "data"}; //6 Fields
-        Object[] columnNames = { "ID", "Bid", "Ask"}; //6 Fields
-        Object[][] data =
-        {
-                { "abc" , new Double(850.503)  , 53 }   ,
-                { "lmn" , new Double(36.23254) , 6  }   ,
-                { "pqr" , new Double(8.3)      , 7  }   ,
-                { "xyz" , new Double(246.0943) , 23 }
-        };
-
-        table = new JTable(data, columnNames) {
-            private static final long serialVersionUID = 1L;
-        };
-
-        // Add the table to a scrolling pane
-        scrollPane = new JScrollPane( table );
-        topPanel.add( scrollPane, BorderLayout.CENTER );
-    }
-*/
