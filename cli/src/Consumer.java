@@ -40,13 +40,13 @@ public class Consumer implements Runnable {
                 trade.get(array);
                 String data = new String(array);
 
-                System.out.println("First: " + first);
-                System.out.println("ID: " + id);
-                System.out.println("Time: " + time);
-                System.out.println("Bid: " + bid);
-                System.out.println("Ask: " + ask);
-                System.out.println("Size: " + size);
-                System.out.println("Data: " + data);
+                    System.out.println("First: " + first);
+                    System.out.println("ID: " + id);
+                    System.out.println("Time: " + time);
+                    System.out.println("Bid: " + bid);
+                    System.out.println("Ask: " + ask);
+                    System.out.println("Size: " + size);
+                    System.out.println("Data: " + data);
             }
         } catch (InterruptedException e) {
             e.printStackTrace();
